@@ -946,6 +946,43 @@ VARIABLE_NOTES: dict[str, tuple[str, str, str]] = {
         "Seconds the outpainting proxy waits for the image backend before giving "
         "up on a single request.",
     ),
+    "ODYSSEUS_JEFF_": ("Agent loop and tool execution", INTERNAL, "Prefix for per-job decision adapter opt-ins; each job is disabled by default."),
+    "ODYSSEUS_JEFF_TIMEOUT": ("Agent loop and tool execution", INTERNAL, "Timeout in seconds for a decision adapter request."),
+    "ODYSSEUS_JEFF_URL": ("Agent loop and tool execution", INTERNAL, "Base URL of the optional decision adapter service."),
+    "ODYSSEUS_PRIVATE_BROWSER_LEGACY": ("Agent loop and tool execution", INTERNAL, "Explicit opt-in to the legacy browser compatibility transport; disabled by default."),
+    "ODYSSEUS_SPEC_BROWSER_FALLBACK": ("Agent loop and tool execution", INTERNAL, "Optional browser routing fallback: mcp, web, or 0 to disable."),
+    "ODYSSEUS_SPEC_DRIVER_TOPK": ("Agent loop and tool execution", INTERNAL, "Number of router-selected tool candidates exposed in a driver round."),
+    "ODYSSEUS_SPEC_MODE": ("Agent loop and tool execution", INTERNAL, "Spec routing mode for explicitly configured models, including strict and driver."),
+    "ODYSSEUS_SPEC_ROUTER_MIN_CONF": ("Agent loop and tool execution", INTERNAL, "Minimum tool-selection confidence accepted from the router."),
+    "ODYSSEUS_SPEC_ROUTER_MODEL": ("Agent loop and tool execution", INTERNAL, "Decision adapter model used for tool routing."),
+    "ODYSSEUS_SPEC_ROUTER_SECOND": ("Agent loop and tool execution", INTERNAL, "Minimum confidence for adding a secondary tool candidate."),
+    "ODYSSEUS_SPEC_ROUTER_TIMEOUT": ("Agent loop and tool execution", INTERNAL, "Time budget in seconds for a router decision."),
+    "ODYSSEUS_SPEC_ROUTER_URL": ("Agent loop and tool execution", INTERNAL, "Base URL of the optional Spec router; an empty URL disables requests."),
+    "ODYSSEUS_SPEC_SUBSET_OF_BASE": ("Agent loop and tool execution", INTERNAL, "Limit Spec tool selections to the existing request inventory by default."),
+    "ODYSSEUS_SPEC_THINK_MIN_P": ("Agent loop and tool execution", INTERNAL, "Minimum router confidence for enabling thinking."),
+    "ODYSSEUS_SPEC_THINK_MODEL": ("Agent loop and tool execution", INTERNAL, "Optional thinking decision adapter model, falling back to the tool router model."),
+    "ODYSSEUS_SPEC_THINK_QUESTION": ("Agent loop and tool execution", INTERNAL, "Thinking classifier question format: binary or kind5."),
+    "ODYSSEUS_SPEC_THINK_ROUTER": ("Agent loop and tool execution", INTERNAL, "Enable router thinking decisions for explicitly configured Spec models."),
+    "ODYSSEUS_SPEC_TOOL_FORMAT": ("Agent loop and tool execution", INTERNAL, "Use names for compact router tool signatures, otherwise include descriptions."),
+    "ODYSSEUS_SPEC_TRIM_PROMPT": ("Agent loop and tool execution", INTERNAL, "Enable prompt trimming for the selected Spec tool menu."),
+    "ODYSSEUS_VISION_MAX_SIDE": ("Upload and media limits", USER, "Maximum pixel side for image attachments sent directly to a vision model."),
+    "ODYSSEUS_VISION_MODELS": ("Model routing and providers", USER, "Comma-separated model-name fragments that explicitly support inline images."),
+    "ODYSSEUS_VISION_PROBE": ("Model routing and providers", USER, "Allow a cached vision-capability probe against local model endpoints."),
+    "ODYSSEUS_SPEC_DIRECT_MODE": (
+        "Agent loop and tool execution", INTERNAL,
+        "Controls how the spec router answers high-confidence direct-answer turns; "
+        "either tool_choice_none (default) or empty_menu.",
+    ),
+    "ODYSSEUS_SPEC_DIRECT_NOTOOLS": (
+        "Agent loop and tool execution", INTERNAL,
+        "Set to 1, true, yes or on to enable the spec router's direct-answer "
+        "no-tools path for high-confidence answer_directly decisions.",
+    ),
+    "ODYSSEUS_SPEC_DIRECT_MIN_P": (
+        "Agent loop and tool execution", INTERNAL,
+        "Minimum confidence probability a spec-router direct-answer decision must "
+        "reach before the no-tools path is taken.",
+    ),
     "ODYSSEUS_GRACEFUL_SHUTDOWN_TIMEOUT": (
         "Deployment and first run", INTERNAL,
         "Seconds the server waits for in-flight requests and background loops to "

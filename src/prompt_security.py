@@ -78,6 +78,8 @@ def untrusted_context_message(
     """
     safe_label = _sanitize_label(label)
     text = "" if content is None else str(content)
+    import logging as _lg
+    _lg.getLogger("src.prompt_security").info("[spec-debug] untrusted block label=%r content_chars=%d", safe_label[:80], len(text))
     text = _escape_guard_markers(text)
     metadata: Dict[str, Any] = {
         "trusted": False,

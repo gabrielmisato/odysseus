@@ -1558,8 +1558,29 @@ def _agent_subprocess_env() -> dict:
     return base
 
 
+def _legacy_private_browser_enabled() -> bool:
+    return os.getenv("ODYSSEUS_PRIVATE_BROWSER_LEGACY", "0").strip().lower() not in {"0", "false", "no", "off"}
 
 
+async def _legacy_private_browser(operation, transport, *, progress_cb=None, session_id=None, owner=None):
+    from src.agent_tools.web_tools_prewave3 import PrivateBrowserTool
+    ctx = {
+        "progress_cb": progress_cb,
+        "subproc_env": _agent_subprocess_env(),
+        "session_id": session_id,
+        "owner": owner,
+    }
+    try:
+        result = await PrivateBrowserTool().execute(operation.input, ctx)
+    except asyncio.CancelledError:
+        raise
+    except Exception as error:
+        logger.warning("legacy private_browser failed: %s", error)
+        return f"{transport}: ERROR", {"error": f"private_browser: {error}", "exit_code": 1}
+    if not isinstance(result, dict):
+        result = {"output": str(result), "exit_code": 0}
+    label = "ERROR" if result.get("error") or result.get("exit_code") not in (None, 0) else "EXECUTED"
+    return f"{transport}: {label}", result
 
 
 async def _direct_fallback(
@@ -1735,6 +1756,12 @@ async def execute_tool_block(
         }
 
     transport = operation.transport_tool
+    if operation.tool == "private_browser" and _legacy_private_browser_enabled():
+        # Restored pre-Wave-3 private_browser (agent-browser CLI). The Wave 3
+        # producer in src.browser_identity refuses every page action in this
+        # build. This compatibility transport requires an explicit opt-in.
+        return await _legacy_private_browser(
+            operation, transport, progress_cb=progress_cb, session_id=session_id, owner=owner)
     if operation.tool == "private_browser":
         try:
             _, browser_args = parse_browser_operation(operation.input)

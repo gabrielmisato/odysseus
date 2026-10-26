@@ -54,7 +54,7 @@ class FakeSession:
 
     def get_context_messages(self):
         return [
-            {"role": "user", "content": "Tell me where I live."},
+            {"role": "user", "content": "My home is in Lisbon. My role is architect."},
             {"role": "assistant", "content": "Noted."},
         ]
 
@@ -118,7 +118,7 @@ def test_vector_match_from_other_tenant_does_not_drop_users_fact(monkeypatch):
     ])
     # The vector store reports user B's new fact as a near-duplicate of a1.
     vec = FakeVector(match_id="a1")
-    _install_llm_stub(monkeypatch, '["My home is in Lisbon"]')
+    _install_llm_stub(monkeypatch, '[{"text":"My home is in Lisbon","evidence":"My home is in Lisbon"}]')
 
     memory_extractor = _load_extractor()
 
@@ -147,7 +147,7 @@ def test_identity_auto_pin_stops_after_first_five_for_owner(monkeypatch):
     ])
     _install_llm_stub(
         monkeypatch,
-        '[{"text": "New identity that should not stay pinned", "category": "identity"}]',
+        '[{"text": "User works as an architect", "category": "identity", "evidence": "My role is architect"}]',
     )
 
     memory_extractor = _load_extractor()
@@ -158,7 +158,7 @@ def test_identity_auto_pin_stops_after_first_five_for_owner(monkeypatch):
     ))
 
     rows = mm.load(owner="userA")
-    added = next(r for r in rows if r["text"] == "New identity that should not stay pinned")
+    added = next(r for r in rows if r["text"] == "User works as an architect")
     assert added.get("category") == "identity"
     assert added.get("pinned") is not True
     assert sum(1 for r in rows if r.get("category") == "identity" and r.get("pinned")) == 5

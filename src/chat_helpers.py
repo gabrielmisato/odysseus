@@ -81,6 +81,16 @@ def is_vision_model(model_name: str) -> bool:
     drops the image entirely. See issue #124.
     """
     m = (model_name or "").lower()
+    if not m:
+        return False
+    # Per-model override (comma-separated substrings), e.g. a local model whose
+    # name carries no vision/VL hint but answers images natively.
+    override = os.getenv("ODYSSEUS_VISION_MODELS", "")
+    if override:
+        for token in override.split(","):
+            token = token.strip().lower()
+            if token and token in m:
+                return True
     if any(kw in m for kw in _VISION_MODEL_KEYWORDS):
         return True
     return bool(_VISION_VL_RE.search(m))
@@ -164,8 +174,10 @@ def lmstudio_supports_vision(url: str, model: str) -> Optional[bool]:
 
 def model_supports_vision(model_name: str, endpoint_url: str = "") -> bool:
     """Whether a model accepts images, using the endpoint's reported
-    capability when available (LM Studio) and falling back to name-based
-    detection otherwise."""
+    capability when available (LM Studio), a cached one-time probe for local
+    OpenAI-compatible endpoints, and name-based detection otherwise."""
+    if is_vision_model(model_name):
+        return True
     if endpoint_url:
         try:
             advertised = lmstudio_supports_vision(endpoint_url, model_name or "")
@@ -173,7 +185,83 @@ def model_supports_vision(model_name: str, endpoint_url: str = "") -> bool:
             advertised = None
         if advertised is not None:
             return advertised
+        try:
+            probed = probe_endpoint_supports_vision(endpoint_url, model_name or "")
+        except Exception:
+            probed = None
+        if probed is not None:
+            return probed
     return is_vision_model(model_name)
+
+
+# 1x1 red PNG — the cheapest possible image probe payload.
+_PROBE_IMAGE_DATA_URL = (
+    "data:image/png;base64,"
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+)
+_VISION_PROBE_TTL = 3600.0
+# (host, model) -> (bool | None, expiry); None = undecidable (auth/network).
+_vision_probe_cache: dict = {}
+
+
+def _vision_probe_enabled() -> bool:
+    return os.getenv("ODYSSEUS_VISION_PROBE", "1").strip().lower() not in ("0", "false", "off", "no")
+
+
+def _chat_completions_url(endpoint_url: str) -> str:
+    base = (endpoint_url or "").rstrip("/")
+    if base.endswith("/chat/completions"):
+        return base
+    return base + "/chat/completions"
+
+
+def probe_endpoint_supports_vision(endpoint_url: str, model_name: str) -> Optional[bool]:
+    """One-time (cached) probe: does a local OpenAI-compatible endpoint accept
+    an image_url content part for `model_name`?
+
+    Returns True on a 200, False when the endpoint rejects the image (400/413/
+    415/422), and None when we cannot decide (remote host, auth required,
+    unreachable, or probing disabled) so the caller falls back to name rules.
+    """
+    if not endpoint_url or not model_name or not _vision_probe_enabled():
+        return None
+    parsed = urlparse(endpoint_url)
+    if not _is_local_host(parsed.hostname):
+        return None  # never probe a public provider
+    key = ((parsed.hostname or "").lower(), (parsed.port or 0), model_name.strip().lower())
+    now = time.time()
+    cached = _vision_probe_cache.get(key)
+    if cached is not None and cached[1] > now:
+        return cached[0]
+    payload = {
+        "model": model_name,
+        "max_tokens": 1,
+        "stream": False,
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Reply with one word."},
+                {"type": "image_url", "image_url": {"url": _PROBE_IMAGE_DATA_URL}},
+            ],
+        }],
+    }
+    verdict: Optional[bool] = None
+    try:
+        r = httpx.post(_chat_completions_url(endpoint_url), json=payload, timeout=8.0)
+        if r.status_code == 200:
+            verdict = True
+        elif r.status_code in (400, 413, 415, 422):
+            body = (r.text or "").lower()
+            if any(tok in body for tok in ("image", "vision", "multimodal", "content type")):
+                verdict = False
+            else:
+                verdict = False
+    except Exception:
+        verdict = None
+    _vision_probe_cache[key] = (verdict, now + _VISION_PROBE_TTL)
+    if verdict is not None:
+        logger.info("vision probe %s@%s -> %s", model_name, parsed.hostname, verdict)
+    return verdict
 
 
 def validate_message(message: str) -> str:

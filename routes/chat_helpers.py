@@ -571,6 +571,50 @@ async def auto_name_session(session_manager, sess):
 
         endpoint_url = str(getattr(sess, "endpoint_url", "") or "")
         model_name = str(getattr(sess, "model", "") or "")
+
+        # The spec ("Ajax") model names its own chats from the user's first
+        # prompt. This function only runs after the first response stream has
+        # settled (auto_name_session_after_stream), so titling does not
+        # contend with the visible answer. Thinking is disabled and the
+        # budget kept small so the model returns a bare title.
+        try:
+            from src.model_profiles import uses_odysseus_progressive_thinking
+            _is_spec_model = bool(model_name) and uses_odysseus_progressive_thinking(model_name)
+        except Exception:
+            _is_spec_model = False
+        if _is_spec_model and endpoint_url:
+            _headers = getattr(sess, "headers", None)
+            if isinstance(_headers, str):
+                try:
+                    _headers = json.loads(_headers)
+                except Exception:
+                    _headers = None
+            try:
+                title = await llm_call_async(
+                    endpoint_url,
+                    model_name,
+                    [
+                        {"role": "system", "content": "Generate a short title (3-6 words, no quotes) for a conversation that starts with this message. Reply with ONLY the title, nothing else. Do NOT include any thinking, reasoning, or explanation \u2014 just the title."},
+                        {"role": "user", "content": first_msg},
+                    ],
+                    temperature=0.3,
+                    max_tokens=32,
+                    headers=_headers or None,
+                    timeout=20,
+                    thinking_mode="off",
+                )
+            except Exception as e:
+                logger.warning("[auto-name] spec title call failed for %s: %s", sess.id, e)
+                title = ""
+            title = str(title or "").strip().strip('"\'').strip()
+            from src.text_helpers import strip_think
+            title = strip_think(title, prose=False, prompt_echo=False)
+            if not title or len(title) >= 80 or "\n" in title:
+                title = fallback_session_title(first_msg)
+            session_manager.update_session_name(sess.id, title)
+            logger.info(f"Auto-named spec session {sess.id}: {title}")
+            return
+
         if (
             "ttft" in model_name.lower()
             or re.search(r":18\d{3}\b", endpoint_url)
