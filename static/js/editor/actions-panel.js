@@ -32,10 +32,10 @@ export const ACTION_COMMANDS = Object.freeze([
 
 const STORAGE_KEY = 'ge-actions';
 
-function el(tag, className, html) {
+function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
-  if (html != null) node.innerHTML = html;
+  if (text != null) node.textContent = text;
   return node;
 }
 
@@ -100,7 +100,11 @@ export function createActionsPanel({ showToast = () => {}, getLayers = null, sel
     }
     steps.forEach((step, index) => {
       const command = commandById(step);
-      const row = el('div', 'ge-actions-step', `<span class="ge-actions-step-index">${index + 1}</span><span class="ge-actions-step-label">${command ? command[1] : step}</span>`);
+      const row = el('div', 'ge-actions-step');
+      row.append(
+        el('span', 'ge-actions-step-index', String(index + 1)),
+        el('span', 'ge-actions-step-label', command ? command[1] : step),
+      );
       const remove = el('button', 'ge-action-remove', '✕');
       remove.type = 'button';
       remove.addEventListener('click', () => { steps.splice(index, 1); renderList(); });
