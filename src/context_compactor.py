@@ -634,8 +634,16 @@ async def maybe_compact(
     )
 
     # Use utility model if configured, otherwise fall back to session model
-    # Compact with the chat model itself (the one being evaluated), never a separate utility model.
-    compact_url, compact_model, compact_headers = endpoint_url, model, headers
+    util_url, util_model, util_headers = resolve_endpoint(
+        "utility",
+        fallback_url=endpoint_url,
+        fallback_model=model,
+        fallback_headers=headers,
+        owner=owner,
+    )
+    compact_url = util_url or endpoint_url
+    compact_model = util_model or model
+    compact_headers = util_headers if util_url else headers
 
     prompt = SELF_SUMMARY_SYSTEM_PROMPT.replace(
         "{count}", str(len(older))

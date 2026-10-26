@@ -25430,16 +25430,19 @@ async def stream_agent_loop(
                     if schema.get("function", {}).get("name") not in disabled_tools
                     and schema.get("name") not in disabled_tools
                 ]
-            if _pure_web_turn and tool_surface != "full" and not (route_state.get("spec_surface") and os.getenv("ODYSSEUS_SPEC_MODE", "strict").strip().lower() == "strict"):
-                allowed = _web_only_route_tools(_last_user, disabled_tools)
-                schemas = [
-                    schema for schema in schemas
-                    if (
-                        schema.get("function", {}).get("name")
-                        or schema.get("name")
-                    ) in allowed
-                    or schema.get("function", {}).get("name") in external_names
-                ]
+            if _pure_web_turn and tool_surface != "full":
+                strict_spec = (route_state.get("spec_surface") and
+                               os.getenv("ODYSSEUS_SPEC_MODE", "strict").strip().lower() == "strict")
+                if not strict_spec:
+                    allowed = _web_only_route_tools(_last_user, disabled_tools)
+                    schemas = [
+                        schema for schema in schemas
+                        if (
+                            schema.get("function", {}).get("name")
+                            or schema.get("name")
+                        ) in allowed
+                        or schema.get("function", {}).get("name") in external_names
+                    ]
             schemas = _drop_legacy_email_alias_schemas_when_mcp_available(schemas)
             schemas = _apply_tool_surface_to_schemas(schemas, tool_surface)
             if (
