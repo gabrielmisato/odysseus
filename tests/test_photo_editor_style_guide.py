@@ -13,6 +13,15 @@ import routes.editor_agent_routes as eaar
 from src import editor_style_guide as guide
 
 
+@pytest.mark.parametrize('prompt,target,expected', [
+    ('make the red car into blue', 'blue', 'red car'),
+    ('make' + '\t' * 20000 + 'the red\tcar blue', 'blue', 'red car'),
+    ('make' + '\t' * 20000, 'blue', 'the subject'),
+])
+def test_recolor_phrase_cleanup_handles_long_whitespace(prompt, target, expected):
+    assert guide._recolor_object_phrase(prompt, target) == expected
+
+
 @pytest.fixture(autouse=True)
 def _reset_planner():
     eaar.set_editor_planner(None)

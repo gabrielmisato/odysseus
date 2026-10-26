@@ -552,9 +552,12 @@ def _recolor_object_phrase(prompt: str, target_word: str) -> str:
     if target_word:
         phrase = re.sub(r"\b" + re.escape(target_word) + r"\b", " ", phrase,
                         count=1, flags=re.I)
-    phrase = re.sub(r"\s+", " ", phrase).strip(" .,!?")
-    phrase = re.sub(r"^(?:to|into|the|a|an)\s+", "", phrase, flags=re.I).strip()
-    phrase = re.sub(r"\s+(?:to|into)$", "", phrase, flags=re.I).strip()
+    words = " ".join(phrase.split()).strip(" .,!?").split()
+    if len(words) > 1 and words[0].casefold() in {"to", "into", "the", "a", "an"}:
+        words.pop(0)
+    if len(words) > 1 and words[-1].casefold() in {"to", "into"}:
+        words.pop()
+    phrase = " ".join(words)
     while phrase and _RECOLOR_TRAILING_ADJ.search(phrase):
         phrase = _RECOLOR_TRAILING_ADJ.sub("", phrase).strip()
     return phrase or "the subject"
