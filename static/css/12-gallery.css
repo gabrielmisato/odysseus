@@ -90,6 +90,12 @@
 .lib-tabs,
 .gallery-tabs,
 .preset-tabs {
+  /* A flex-item tab strip defaults to min-width:auto, so it grows to its
+     content width inside a narrow modal and the end tabs get clipped by the
+     modal's overflow instead of scrolling. min-width:0 lets the strip shrink
+     to the container so the overflow-x:auto below actually engages. */
+  min-width: 0;
+  max-width: 100%;
   flex-wrap: nowrap !important;
   overflow-x: auto !important;
   overflow-y: hidden;

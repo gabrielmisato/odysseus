@@ -34,6 +34,8 @@ export function createStreamRenderer(contentEl, { render, hljs } = {}) {
   let tailShownLen = 0; // rendered-text length of the live tail (drives token fade)
   let appendMode = null; // { codeText: Text, appendedLen } while an open fence streams
   let degraded = !ENABLED; // true once we fall back to full re-render
+  let tailRaf = null; // pending requestAnimationFrame id for the live-tail re-render
+  let pendingTail = ''; // most recent tail text awaiting a rAF re-render
 
   function start() {
     contentEl.textContent = '';
@@ -77,6 +79,24 @@ export function createStreamRenderer(contentEl, { render, hljs } = {}) {
     fadeNewText(holder, tailShownLen);
     tailShownLen = holder.textContent.length;
     while (holder.firstChild) contentEl.appendChild(holder.firstChild);
+  }
+
+  // Coalesce the per-token tail re-render into at most one render per animation
+  // frame. Fast providers emit many deltas per frame; the frozen-block pass is
+  // cheap and stays synchronous, but the markdown re-parse + innerHTML write of
+  // the still-growing tail only needs to happen once per frame for smooth output.
+  function scheduleTailRender(tailText) {
+    pendingTail = tailText;
+    if (tailRaf !== null) return;
+    tailRaf = requestAnimationFrame(() => {
+      tailRaf = null;
+      // The container may have been rewritten out from under us (chat.js writes
+      // contentEl.innerHTML for thinking indicators and tool blocks). Skip and
+      // let the next update() self-heal rather than appending stale tail nodes.
+      if (tailMarker && tailMarker.parentNode === contentEl) {
+        renderTail(pendingTail);
+      }
+    });
   }
 
   // Stream the body of an unterminated code fence by appending only the new
@@ -187,6 +207,7 @@ export function createStreamRenderer(contentEl, { render, hljs } = {}) {
   function finalize() {
     if (degraded) return;
     try {
+      if (tailRaf !== null) { cancelAnimationFrame(tailRaf); tailRaf = null; }
       if (!started) start();
       clearTail();
       appendMode = null;

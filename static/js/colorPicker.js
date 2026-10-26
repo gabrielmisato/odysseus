@@ -96,6 +96,21 @@ function computeSuggestions() {
   ];
 }
 
+// ── Reusable helpers for hosts that surface swatches inline ──────────
+// (e.g. the editor's SWATCHES panel showing suggestions + recents).
+export function getRecentColors() { return getRecents(); }
+export function recordRecentColor(hex) { addRecent(hex); }
+export function suggestColorsFor(hex) {
+  const { h, s, v } = hexToHsv(hex || '#000000');
+  return [
+    { hex: hsvToHex(h + 180, s, v),                                   label: 'Complement' },
+    { hex: hsvToHex(h + 30, s, v),                                    label: 'Analogous +30°' },
+    { hex: hsvToHex(h - 30, s, v),                                    label: 'Analogous -30°' },
+    { hex: hsvToHex(h + 150, s, v),                                   label: 'Split-complement' },
+    { hex: hsvToHex(h, s, clamp(v > 50 ? v - 30 : v + 30, 10, 95)),   label: 'Tone shift' },
+  ];
+}
+
 // ── Popover build ─────────────────────────────────────────────────────
 function buildPopover() {
   const p = document.createElement('div');

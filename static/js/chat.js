@@ -44,6 +44,66 @@ import { invalidateSettings } from './appConfig.js';
   const RUN_ID_ABORT_GRACE_MS = 2000; // timeout waits this long for a run-id header before hard-aborting
   const RESEARCH_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>';
 
+  // URL of the photo attached to the current turn (chat uploads are served at
+  // /api/upload/<id>). Used by the "Open in editor & apply" action.
+  function _currentAttachedImageUrl() {
+    try {
+      const box = document.getElementById('chat-history');
+      if (!box) return null;
+      // Use the newest user bubble that carries an image preview. Note
+      // ':last-of-type' is wrong here (it selects the last sibling of the
+      // element type, and the assistant reply follows the user bubble), so
+      // walk the user bubbles from the end instead.
+      const users = box.querySelectorAll('.msg-user');
+      for (let i = users.length - 1; i >= 0; i--) {
+        const img = users[i].querySelector('.attach-image-preview[data-file-id] img');
+        if (img && img.getAttribute('src')) return img.getAttribute('src');
+      }
+      // Fall back to any attachment preview/card in the history (newest).
+      const previews = box.querySelectorAll(
+        '.attach-image-preview[data-file-id], .attach-card[data-file-id]'
+      );
+      if (previews.length) {
+        const last = previews[previews.length - 1];
+        const id = last.dataset ? last.dataset.fileId : null;
+        if (id) return API_BASE + '/api/upload/' + id;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Render the one-click "Open in editor & apply" button on a photo-edit reply
+  // that had no open editor (photo_editor_action kind 'open_and_apply').
+  function renderPhotoEditorApplyButton(container, action) {
+    if (!container || !action || action.kind !== 'open_and_apply') return;
+    if (container.querySelector('.chat-open-in-editor-btn')) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'chat-open-in-editor-btn';
+    btn.textContent = 'Open in editor & apply';
+    btn.style.cssText = 'margin-top:8px;padding:6px 12px;border-radius:6px;border:1px solid rgba(120,120,120,0.4);background:transparent;color:inherit;cursor:pointer;font:inherit;';
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        if (typeof window.gePhotoEditorApply !== 'function') {
+          await import('/static/js/galleryEditor.js?v=20260909movepicklayer1');
+        }
+        await window.gePhotoEditorApply({
+          imageId: null,
+          imageUrl: _currentAttachedImageUrl(),
+          prompt: action.prompt || '',
+          displayName: 'Chat edit',
+        });
+      } catch (err) {
+        console.error('[chat] open_and_apply failed', err);
+        btn.disabled = false;
+      }
+    });
+    container.appendChild(btn);
+  }
+
   let API_BASE = '';
   let currentAbort = null;
   let isStreaming = false;
@@ -4095,6 +4155,7 @@ import { invalidateSettings } from './appConfig.js';
                   threadAbove.classList.add('has-bottom');
                 }
                 terminalFinalResponseRendered = _renderTerminalAnswer(finalText, '', json.render_owner, json.replacement_scope);
+                if (json.photo_editor_action) renderPhotoEditorApplyButton(roundHolder, json.photo_editor_action);
                 lastContentRoundHolder = roundHolder || lastContentRoundHolder;
                 uiModule.scrollHistory();
                 continue;
@@ -6519,6 +6580,7 @@ import { invalidateSettings } from './appConfig.js';
             gotDelta = true;
             try { spinner.destroy(); } catch (_) {}
             renderDelta(json);
+            if (json.photo_editor_action) renderPhotoEditorApplyButton(roundHolder, json.photo_editor_action);
             replayRendering.settle();
           } else if (json.delta) {
             if (!replayRendering.accepts(json)) continue;
