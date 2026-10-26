@@ -143,6 +143,7 @@ PLAN_MODE_READONLY_TOOLS = {
     "resolve_contact",
     "chat_with_model",
     "ask_teacher",
+    "get_editor_screenshot",
 }
 
 
@@ -179,6 +180,7 @@ _PLAN_MODE_KNOWN_MUTATORS = {
     "download_model", "serve_model",
     "stop_served_model", "cancel_download", "adopt_served_model", "serve_preset",
     "generate_image", "edit_image", "trigger_research", "manage_research",
+    "plan_edit", "run_editor_command", "ai_edit_image",
     # Shell is never read-only-safe; block it explicitly so it stays out of plan
     # mode even if the schema list fails to load.
     "bash", "python",

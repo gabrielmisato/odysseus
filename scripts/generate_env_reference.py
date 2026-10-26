@@ -914,6 +914,43 @@ VARIABLE_NOTES: dict[str, tuple[str, str, str]] = {
         "Overrides the source commit reported for runtime provenance, for builds "
         "that ship without a git directory.",
     ),
+
+    # -- Photo editor and image operations -----------------------------------
+    "ODYSSEUS_EDITOR_AGENT_BASES": (
+        "Model routing and providers", USER,
+        "Comma-separated base URLs for the image-editor agent backends; a single "
+        "base URL in the model endpoint config wins over this list.",
+    ),
+    "ODYSSEUS_ALLOW_LOCAL_IMAGE_MODELS": (
+        "Model routing and providers", USER,
+        "Set to 1, true, yes or on to allow local image-generation and editing "
+        "backends to be reachable as image providers.",
+    ),
+    "ODYSSEUS_IMAGE_OPS_BASE": (
+        "Model routing and providers", USER,
+        "Base URL of the image-operations backend (inpaint, outpainting and style "
+        "transfer); a trailing slash is stripped before use.",
+    ),
+    "ODYSSEUS_IMAGE_EDIT_MAX_SIDE": (
+        "Upload and media limits", USER,
+        "Maximum pixel side (width or height) an edited image is downscaled to "
+        "before it is sent to the image backend.",
+    ),
+    "ODYSSEUS_IMAGE_EDIT_MAX_STEPS": (
+        "Upload and media limits", USER,
+        "Maximum number of iterative edit steps the image backend may perform in "
+        "a single request.",
+    ),
+    "ODYSSEUS_IMAGE_OUTPAINT_TIMEOUT": (
+        "Upload and media limits", USER,
+        "Seconds the outpainting proxy waits for the image backend before giving "
+        "up on a single request.",
+    ),
+    "ODYSSEUS_GRACEFUL_SHUTDOWN_TIMEOUT": (
+        "Deployment and first run", INTERNAL,
+        "Seconds the server waits for in-flight requests and background loops to "
+        "finish during a graceful shutdown.",
+    ),
 }
 
 

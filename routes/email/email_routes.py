@@ -43,6 +43,7 @@ from starlette.concurrency import run_in_threadpool
 from fastapi import APIRouter, Query, UploadFile, File, BackgroundTasks, HTTPException, Depends, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from src.constants import DATA_DIR
+from src import shutdown as _shutdown
 from src.path_confinement import confine
 
 from src.llm_core import llm_call_async
@@ -1834,12 +1835,54 @@ def setup_email_routes():
             return None
         return v[1]
 
+    _LIST_STALE = {}
+
+    def _list_stale_get(key):
+        return _LIST_STALE.get(key)
+
+    def _list_stale_put(key, value):
+        _LIST_STALE[key] = value
+        if len(_LIST_STALE) > 96:
+            for k in list(_LIST_STALE.keys())[:-48]:
+                _LIST_STALE.pop(k, None)
+
+    _LIST_REFRESHING = set()
+
     def _list_cache_put(key, value):
         _LIST_CACHE[key] = (_time.monotonic() + _LIST_TTL, value)
+        # Also snapshot the last-good response for stale-while-revalidate.
+        _list_stale_put(key, value)
         # Cap size
         if len(_LIST_CACHE) > 64:
             for k in list(_LIST_CACHE.keys())[:-32]:
                 _LIST_CACHE.pop(k, None)
+
+    def _schedule_list_refresh(sync_args, cache_key, folder, account_id, owner):
+        """Refresh a list snapshot off the event loop, at most once per key.
+
+        Runs the blocking IMAP fetch in a daemon thread, then repopulates both
+        the TTL cache and the stale snapshot so the next list view is warm.
+        """
+        if cache_key in _LIST_REFRESHING:
+            return
+        _LIST_REFRESHING.add(cache_key)
+
+        def _run():
+            try:
+                refreshed = _list_emails_sync(*sync_args)
+                if refreshed and not refreshed.get("error"):
+                    _list_cache_put(cache_key, refreshed)
+                    try:
+                        _schedule_recent_email_warm(
+                            refreshed.get("emails") or [], folder, account_id, owner)
+                    except Exception:
+                        pass
+            except Exception as exc:  # pragma: no cover - background best effort
+                logger.debug("email list background refresh failed: %s", exc)
+            finally:
+                _LIST_REFRESHING.discard(cache_key)
+
+        _threading.Thread(target=_run, daemon=True, name="email-list-refresh").start()
 
     def _folder_cache_get(account_id, owner):
         key = (account_id or "", owner or "")
@@ -2867,6 +2910,46 @@ def setup_email_routes():
                         owner, account_id or "", folder, filter, limit, offset, elapsed_ms,
                     )
                 return cached
+        # Stale-while-revalidate: never block a plain list view on IMAP while
+        # we already hold a recent snapshot or a durable index. Serve it now
+        # with a `stale` marker and refresh in the background so the next view
+        # is warm. Blocking IMAP only remains for a genuine cold start with no
+        # snapshot and no indexed rows (e.g. a brand-new account/folder).
+        if not from_addr and not has_attachments and not (date_from or date_to):
+            snapshot = _list_stale_get(ck)
+            if snapshot is None:
+                try:
+                    indexed_emails, indexed_total, indexed_at = _email_index_list(
+                        owner, account_id, folder, filter, limit, offset, False,
+                    )
+                except Exception:
+                    indexed_emails, indexed_total, indexed_at = [], 0, None
+                if indexed_total:
+                    snapshot = {
+                        "emails": indexed_emails,
+                        "total": indexed_total,
+                        "folder": folder,
+                        "offset": offset,
+                        "sync": {
+                            "source": "index",
+                            "indexed": indexed_total,
+                            "updated_at": indexed_at,
+                        },
+                    }
+            if snapshot is not None:
+                payload = dict(snapshot)
+                payload["emails"] = list(payload.get("emails") or [])
+                _hide_unlinked_calendar_tags(payload["emails"])
+                sync_meta = dict(payload.get("sync") or {})
+                sync_meta["source"] = "cache_stale" if _list_stale_get(ck) is not None else "index"
+                sync_meta["stale"] = True
+                payload["sync"] = sync_meta
+                _schedule_list_refresh(
+                    (folder, limit, offset, filter, account_id, from_addr,
+                     bool(has_attachments), owner, True, date_from or "", date_to or ""),
+                    ck, folder, account_id, owner,
+                )
+                return payload
         result = await _asyncio.to_thread(
             _list_emails_sync, folder, limit, offset, filter, account_id, from_addr,
             bool(has_attachments), owner, manual_refresh, date_from or "", date_to or "",
@@ -6717,7 +6800,7 @@ def setup_email_routes():
                     await queue.put({'type': 'result', **result})
                 task = asyncio.create_task(run())
                 try:
-                    while True:
+                    while not _shutdown.is_shutting_down():
                         item = await queue.get()
                         yield 'data: ' + json.dumps(item) + '\n\n'
                         if item.get('type') == 'result':

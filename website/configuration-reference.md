@@ -21,7 +21,7 @@ described as a switch that turns something off, the read rejects `0`, `false`,
 `no` and `off` and treats everything else as on. The `Default` column is the
 value the code falls back to when the variable is unset, quoted from the source.
 
-The source tree reads **117** `ODYSSEUS_*` variables: 81 an operator may want to set, and 36 that are internal - sentinels, fixture switches, capture hooks and development tooling. The internal ones are listed too, in their own section, so this page can be checked against the source mechanically.
+The source tree reads **124** `ODYSSEUS_*` variables: 87 an operator may want to set, and 37 that are internal - sentinels, fixture switches, capture hooks and development tooling. The internal ones are listed too, in their own section, so this page can be checked against the source mechanically.
 
 > This page is generated. Edit `scripts/generate_env_reference.py` and
 > re-run it; `tests/test_env_reference.py` enforces that the committed page
@@ -58,10 +58,13 @@ The source tree reads **117** `ODYSSEUS_*` variables: 81 an operator may want to
 
 | Variable | Default | Read in | What it does |
 |---|---|---|---|
+| `ODYSSEUS_ALLOW_LOCAL_IMAGE_MODELS` | `''` | `routes/gallery/gallery_routes.py` | Set to 1, true, yes or on to allow local image-generation and editing backends to be reachable as image providers. |
 | `ODYSSEUS_COPILOT_API_VERSION` | `'2026-06-01'` | `src/copilot.py` | Dated API-version header the Copilot models and chat endpoints require. |
 | `ODYSSEUS_COPILOT_CLIENT_ID` | `'01ab8ac9400c4e429b23'` | `src/copilot.py` | GitHub OAuth client id for the Copilot device flow. The default is the public VS Code client id; override it only with your own allow-listed app. |
 | `ODYSSEUS_DEEPSEEK_REASONING_EFFORT` | `'high'` | `src/llm_core.py` | Reasoning effort for DeepSeek. Only `high` and `max` are accepted; any other value falls back to the default. |
+| `ODYSSEUS_EDITOR_AGENT_BASES` | *unset* | `src/editor_agent_model.py` | Comma-separated base URLs for the image-editor agent backends; a single base URL in the model endpoint config wins over this list. |
 | `ODYSSEUS_FIRST_TOKEN_TIMEOUT` | `''` | `src/llm_core.py` | Seconds to wait for the first streamed token from a local endpoint before failing. Unset keeps the generous read timeout, which makes a stalled backend look like a hung agent. |
+| `ODYSSEUS_IMAGE_OPS_BASE` | `''` | `routes/gallery/gallery_routes.py` | Base URL of the image-operations backend (inpaint, outpainting and style transfer); a trailing slash is stripped before use. |
 | `ODYSSEUS_LOCAL_MODEL_GATE` | `'true'` | `src/llm_core.py` | On by default. Set 0, false, no or off to drop the gate that checks a local endpoint before routing a request to it. |
 | `ODYSSEUS_MISTRAL_REASONING_EFFORT` | `'high'` | `src/llm_core.py` | Reasoning effort sent to Mistral thinking-capable models. The API accepts high, medium, low and none. |
 | `ODYSSEUS_MLX_IMAGE_VLM_MODEL` | *unset* | `scripts/mlx_image_server.py` | Vision-language model id for the MLX image server script. Required unless `--vlm-model` is passed on the command line. |
@@ -126,6 +129,9 @@ The source tree reads **117** `ODYSSEUS_*` variables: 81 an operator may want to
 | `ODYSSEUS_GALLERY_TRANSFORM_UPLOAD_MAX_BYTES` | `25 * 1024 * 1024` | `src/upload_limits.py` (+1 more) | Maximum bytes accepted for an image handed to a gallery transform. |
 | `ODYSSEUS_GALLERY_UPLOAD_MAX_BYTES` | `100 * 1024 * 1024` | `src/upload_limits.py` (+1 more) | Maximum bytes accepted for a gallery upload. |
 | `ODYSSEUS_ICS_MAX_BYTES` | `10 * 1024 * 1024` | `src/upload_limits.py` | Maximum bytes accepted for an imported ICS file. |
+| `ODYSSEUS_IMAGE_EDIT_MAX_SIDE` | `'768'` | `routes/gallery/gallery_routes.py` | Maximum pixel side (width or height) an edited image is downscaled to before it is sent to the image backend. |
+| `ODYSSEUS_IMAGE_EDIT_MAX_STEPS` | `'8'` | `routes/gallery/gallery_routes.py` | Maximum number of iterative edit steps the image backend may perform in a single request. |
+| `ODYSSEUS_IMAGE_OUTPAINT_TIMEOUT` | `'900'` | `routes/gallery/gallery_routes.py` | Seconds the outpainting proxy waits for the image backend before giving up on a single request. |
 | `ODYSSEUS_MEDIA_FRAME_TIMEOUT` | `30` | `src/media_ingress.py` | Seconds allowed for extracting frames from a video before giving up. |
 | `ODYSSEUS_MEDIA_MAX_AUDIO_BYTES` | `32 * 1024 * 1024` | `src/media_ingress.py` | Largest source audio file the media pipeline will read. |
 | `ODYSSEUS_MEDIA_MAX_DIMENSION` | `1600` | `src/media_ingress.py` | Longest edge in pixels an image is resized down to before encoding. |
@@ -183,6 +189,12 @@ The source tree reads **117** `ODYSSEUS_*` variables: 81 an operator may want to
 ## Internal and development-only variables
 
 Listed for completeness. Setting one of these on a real install is either a no-op or a way to break something quietly.
+
+### Deployment and first run
+
+| Variable | Default | Read in | What it does |
+|---|---|---|---|
+| `ODYSSEUS_GRACEFUL_SHUTDOWN_TIMEOUT` | `'900'` | `app.py` | Seconds the server waits for in-flight requests and background loops to finish during a graceful shutdown. |
 
 ### Model routing and providers
 
@@ -265,7 +277,7 @@ reads three ways, because no single pattern covers the codebase:
   lines, so one read lives inside a string literal.
 
 The three passes are not redundancy. A line-based grep for a direct
-`os.environ.get("ODYSSEUS_...` call finds 87 of the 117 variables on this
+`os.environ.get("ODYSSEUS_...` call finds 94 of the 124 variables on this
 page. What it misses is reads through an env-reader helper, reads whose call
 spans more than one line, reads whose variable name is held in a module
 constant, and reads through a mapping passed in as an argument - which is the

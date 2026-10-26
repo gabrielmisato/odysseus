@@ -1558,6 +1558,10 @@ def _agent_subprocess_env() -> dict:
     return base
 
 
+
+
+
+
 async def _direct_fallback(
     tool: str,
     content: str,
@@ -2193,7 +2197,8 @@ async def _execute_tool_block_impl(
     if tool == "generate_image":
         from src.ai_interaction import do_generate_image
         desc = "generate_image"
-        result = await dispatched(do_generate_image(content, session_id=session_id, owner=owner))
+        image_privacy = (client_runtime_context or {}).get('web_ui_state', {}).get('incognito') is True
+        result = await dispatched(do_generate_image(content, session_id=session_id, owner=owner, **({'incognito': True} if image_privacy else {})))
     elif (tool in NATIVE_FILESYSTEM_TOOLS
           and (active_resource_operation() is not None or tool != "apply_patch"
                or not _tui_host_bridge_patch_url(client_runtime_context))):
@@ -2353,7 +2358,8 @@ async def _execute_tool_block_impl(
         result = await dispatched(do_list_cookbook_servers(content, owner=owner))
     elif tool == "edit_image":
         desc = "edit_image"
-        result = await dispatched(do_edit_image(content, owner=owner))
+        image_privacy = (client_runtime_context or {}).get('web_ui_state', {}).get('incognito') is True
+        result = await dispatched(do_edit_image(content, owner=owner, **({'incognito': True} if image_privacy else {})))
     elif tool == "edit_file":
         result = await dispatched(_direct_fallback(tool, content)) or {"error": "edit failed", "exit_code": 1}
         desc = result.get("output") or result.get("error") or "edit_file"

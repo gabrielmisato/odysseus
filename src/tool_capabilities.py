@@ -217,6 +217,20 @@ _register(
     result_integrity=ResultIntegrity.EXTERNAL_UNTRUSTED,
 )
 _register(
+    {"ai_edit_image"},
+    ToolEffect.NETWORK_EGRESS,
+    ToolEffect.WRITE_PRIVATE,
+    result_integrity=ResultIntegrity.EXTERNAL_UNTRUSTED,
+)
+_register(
+    {"get_editor_screenshot"},
+    ToolEffect.READ_PRIVATE,
+)
+_register(
+    {"plan_edit", "run_editor_command"},
+    ToolEffect.UI_SIDE_EFFECT,
+)
+_register(
     {
         "archive_email",
         "block_sender",
