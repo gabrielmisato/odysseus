@@ -10,21 +10,19 @@ services:
     # :latest and bare :X.Y.Z tags move on every main push.
     image: ${ODYSSEUS_IMAGE:-ghcr.io/odysseus-dev/odysseus:latest}
     build: .
-    ports:
-      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-7011}:7000"
     volumes:
-      - ${APP_DATA_DIR:-./data}:/app/data:z
-      - ${APP_LOGS_DIR:-./logs}:/app/logs:z
+      - ./data:/app/data
+      - ./logs:/app/logs
       # Cookbook remote-server SSH identity. Odysseus can generate a key here;
       # add the shown public key to each remote server's authorized_keys.
-      - ${APP_DATA_DIR:-./data}/ssh:/app/.ssh:z
+      - ./data/ssh:/app/.ssh
       # Cookbook local model cache. Inside Docker, "Local" means the Odysseus
       # container, so persist its HuggingFace cache under ./data/huggingface.
-      - ${APP_DATA_DIR:-./data}/huggingface:/app/.cache/huggingface:z
+      - ./data/huggingface:/app/.cache/huggingface
       # Cookbook-installed Python CLIs/packages (vLLM, llama-cpp-python, etc.)
       # land under /app/.local for the odysseus user. Persist them so a
       # container recreate does not silently remove installed serve engines.
-      - ${APP_DATA_DIR:-./data}/local:/app/.local:z
+      - ./data/local:/app/.local
     extra_hosts:
       # Lets the container reach local services on the Docker host, including
       # Ollama at http://host.docker.internal:11434.
@@ -109,8 +107,6 @@ services:
 
   chromadb:
     image: docker.io/chromadb/chroma:1.5.9@sha256:1e0b73a187a28757c572acba508c46f48c9e8b0acaf5c20e6d95cdedce1acdf6
-    ports:
-      - "${CHROMADB_BIND:-127.0.0.1}:8100:8000"
     volumes:
       # The image runs `chroma run /config.yaml`, whose persist_path is "/data".
       # It declares no VOLUME, so anything written outside a mount lives in the
@@ -127,7 +123,9 @@ services:
     # tag blocks the whole app from starting. 2026.6.2 crashes on boot with
     # `KeyError: 'default_doi_resolver'`, failing the healthcheck (issue #1414).
     # Update all default/GPU pins together after native startup and trust checks.
-    image: docker.io/searxng/searxng:2026.10.24-ef0ec03da@sha256:7c7cbe509429e82755104b2a95f52085a98633c95d53f44e4e905fa3a59f08c8
+    build:
+      context: .
+      dockerfile: docker/searxng.Dockerfile
     entrypoint:
       - /bin/sh
       - -c
@@ -145,12 +143,8 @@ services:
         # and we carry on, letting searxng report anything genuinely wrong.
         /usr/local/searxng/.venv/bin/python /tmp/migrate-searxng-settings.py /etc/searxng/settings.yml || true
         exec /usr/local/searxng/entrypoint.sh
-    ports:
-      - "127.0.0.1:8080:8080"
     volumes:
       - searxng-data:/etc/searxng
-      - ./config/searxng/settings.yml:/tmp/searxng-settings.yml.template:ro,z
-      - ./scripts/migrate_searxng_settings.py:/tmp/migrate-searxng-settings.py:ro,z
     environment:
       - SEARXNG_BASE_URL=http://localhost:8080/
       - SEARXNG_SECRET=${SEARXNG_SECRET:-}
@@ -179,8 +173,6 @@ services:
   ntfy:
     image: docker.io/binwiederhier/ntfy:v2.32.0@sha256:59250e1d8be2ee2186c4560322f625faef22ace380331f05b63f8842dbd62602
     command: serve
-    ports:
-      - "${NTFY_BIND:-127.0.0.1}:8091:80"
     volumes:
       - ntfy-cache:/var/cache/ntfy
     environment:
